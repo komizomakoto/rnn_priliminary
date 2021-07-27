@@ -1,7 +1,7 @@
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Activation
 from tensorflow.keras.layers import LSTM
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, RMSprop
 from tensorflow.keras.callbacks import EarlyStopping
 import numpy as np
 import matplotlib.pyplot as plt
@@ -62,7 +62,7 @@ def create_dataset(N_TIME,N_INPUTS):
             n_sample_ij = np_input.shape[0] - N_TIME + 1
             input_data_ij = np.zeros((n_sample_ij, N_TIME, N_INPUTS))
             for _ in range(n_sample_ij):
-                input_data_ij[_] = np_input[_:_+N_TIME]
+                input_data_ij[_] = np_input[_:_+N_TIME, 0:N_INPUTS]
             input_data = np.concatenate([input_data, input_data_ij])
 
             #### correct data (m, 1)
@@ -101,15 +101,16 @@ print("correct_data", correct_data[correct_data>0.5].shape)
 # length_of_sequence = g.shape[1] 
 length_of_sequence = input_data.shape[1] 
 out_neurons = 1
-n_hidden = 300
+n_hidden = 32
 
 model = Sequential()
 # model.add(LSTM(n_hidden, batch_input_shape=(None, length_of_sequence, 1), return_sequences=False))
 model.add(LSTM(n_hidden, batch_input_shape=(None, N_TIME, N_INPUTS), return_sequences=False))
 model.add(Dense(out_neurons))
 model.add(Activation("sigmoid"))
-optimizer = Adam(lr=0.01)
-model.compile(loss="mean_squared_error", optimizer=optimizer)
+optimizer = RMSprop(lr=0.1)
+# model.compile(loss="mean_squared_error", optimizer=optimizer)
+model.compile(loss="binary_crossentropy", optimizer=optimizer)
 
 model.summary()
 
@@ -131,8 +132,9 @@ print("predicted", predicted.sum())
 print("predicted", predicted[predicted>0.1].shape)
 print("predicted", np.amax(predicted))
 
-# plt.figure()
+plt.figure()
 # plt.plot(range(25,len(predicted)+25),predicted, color="r", label="predict_data")
-# plt.plot(range(0, len(f)), f, color="b", label="row_data")
-# plt.legend()
-# plt.show()
+# plt.plot(range(0, correct_data.shape[0]), correct_data, color="r", label="row_data")
+plt.plot(range(0, predicted.shape[0]), predicted, color="b", label="predict_data")
+plt.legend()
+plt.show()
