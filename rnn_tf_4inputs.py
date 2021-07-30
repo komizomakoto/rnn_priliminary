@@ -7,11 +7,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import glob
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
 
-N_INPUTS = 1
+N_INPUTS = 2
 N_TIME = 10
-
-THIN_PART = 18
+THIN_PART = 1
 THIN_PART2 = 20
 PATICULAR_ID = 2
 
@@ -34,7 +35,7 @@ def create_dataset(N_TIME,N_INPUTS):
             df_input = pd.read_csv(path_ij, index_col=0)
             df_input = df_input.drop(["time", 'id', 'class'], axis=1) 
             np_input = df_input.to_numpy()
-            np_input = np_input[1:THIN_PART2]
+            np_input = np_input[1:]
             if np_input.shape[0] < N_TIME:
                 continue
             n_sample_ij = np_input.shape[0] - N_TIME + 1
@@ -55,62 +56,78 @@ def create_dataset(N_TIME,N_INPUTS):
             #### related num
             train_data_num = train_data_num + input_data_ij.shape[0]
             data_num += 1
-            break
+            # break
 
     # print("train_data_num", train_data_num)
     input_data = input_data[1:]
     correct_data = correct_data[1:]
     return input_data, correct_data
 
+def main():
+    input_data, correct_data = create_dataset(N_TIME,N_INPUTS)
+    X_train, X_test, Y_train, y_test = train_test_split(input_data, correct_data, test_size = 0.2, random_state = 1)
+    print("input_data shape, ", input_data.shape, "correct_data shape", correct_data.shape)
+    print("X_train shape, ", X_train.shape, "y_train shape", X_train.shape)
 
-input_data, correct_data = create_dataset(N_TIME,N_INPUTS)
-print("input_data", input_data.shape)
-print("correct_data", correct_data.shape)
-print("correct_data", correct_data.sum())
-print("correct_data", correct_data[correct_data>0.5].shape)
+    #### model structure
+    out_neurons = 1
+    n_hidden = 32
 
-#### model structure
-out_neurons = 1
-n_hidden = 32
+    model = Sequential()
+    model.add(LSTM(n_hidden, batch_input_shape=(None, N_TIME, N_INPUTS), return_sequences=True))
+    model.add(LSTM(n_hidden, batch_input_shape=(None, N_TIME, N_INPUTS), return_sequences=False))
+    model.add(Dense(out_neurons))
+    model.add(Activation("sigmoid"))
+    optimizer = RMSprop(lr=0.1)
+    model.compile(loss="binary_crossentropy", 
+    optimizer=optimizer,
+    metrics=['accuracy'])
 
-model = Sequential()
-# model.add(LSTM(n_hidden, batch_input_shape=(None, N_TIME, N_INPUTS), return_sequences=True))
-model.add(LSTM(n_hidden, batch_input_shape=(None, N_TIME, N_INPUTS), return_sequences=False))
-model.add(Dense(out_neurons))
-model.add(Activation("sigmoid"))
-optimizer = RMSprop(lr=0.1)
-model.compile(loss="binary_crossentropy", optimizer=optimizer)
-model.summary()
+    model.summary()
 
-#### model learning
-early_stopping = EarlyStopping(monitor='val_loss', mode='auto', patience=20)
-print("input_data", input_data.shape)
-print("correct_data", correct_data.shape)
-model.fit(input_data, correct_data,
-          batch_size=20,
-          epochs=100,
-          validation_split=0.01,
-          callbacks=[early_stopping]
-          )
+    #### model learning
+    early_stopping = EarlyStopping(monitor='val_loss', mode='auto', patience=20)
+    history = model.fit(input_data, correct_data,
+            batch_size=200,
+            epochs=100,
+            validation_split=0.01,
+            callbacks=[early_stopping]
+            )
 
-print("input_data", input_data.shape)
-print("input_data", input_data.sum())
+    #### prediction
+    predicted = model.predict(X_test)
+    print("input_data shape, ", input_data.shape, "correct_data shape", correct_data.shape)
+    print("num of that correct_data has 1 flag", correct_data[correct_data>0.5].shape)
+    print("num of that predicted has 1 flag", predicted[predicted>0.5].shape)
+
+    predicted[predicted>0.5] = 1
+    predicted[predicted<=0.5] = 0
+    cm = confusion_matrix(y_test, predicted)
+    print("cm", cm)
+    print("accuracy", (cm[0,0]+cm[1,1])/(cm[0,0]+cm[0,1]+cm[1,0]+cm[1,1]))
+
+    #### make figure
+    plt.figure()
+    # compare prediction with correct (divide train and test data by tensorflow)
+    # plt.plot(range(0, correct_data.shape[0]), correct_data, color="r", label="row_data")
+    # plt.plot(range(0, predicted.shape[0]), predicted, color="b", label="predict_data")
+
+    # compare prediction with correct (divide train and test data by sklearn)
+    plt.plot(range(0, y_test.shape[0]), y_test, color="r", label="row_data")
+    plt.plot(range(0, predicted.shape[0]), predicted, color="b", label="predict_data")
+    plt.legend()
+
+    # see train data merely
+    # plt.plot(range(0, input_data.shape[0]), input_data[:,0,0], color="r", label="row_data")
+    # plt.plot(range(0, input_data.shape[1]), input_data[0,:,0], color="r", label="row_data")
+    # plt.plot(range(0, input_data.shape[1]), correct_data[0], color="r", label="row_data")
+
+    # plot the model accuracy and validation accuracy
+    # plt.plot(history.history['accuracy'])
+    # plt.plot(history.history['val_accuracy'])
+    # plt.legend(['accuracy','validation accuracy'])
+    plt.show()
 
 
-#### prediction
-predicted = model.predict(input_data)
-print("predicted", predicted.sum())
-print("predicted", predicted[predicted>0.1].shape)
-print("predicted", np.amax(predicted))
-
-
-#### make figure
-plt.figure()
-plt.plot(range(0, correct_data.shape[0]), correct_data, color="r", label="row_data")
-plt.plot(range(0, predicted.shape[0]), predicted, color="b", label="predict_data")
-
-# plt.plot(range(0, input_data.shape[0]), input_data[:,0,0], color="r", label="row_data")
-# plt.plot(range(0, input_data.shape[1]), input_data[0,:,0], color="r", label="row_data")
-# plt.plot(range(0, input_data.shape[1]), correct_data[0], color="r", label="row_data")
-plt.legend()
-plt.show()
+if __name__ == "__main__":
+    main()
