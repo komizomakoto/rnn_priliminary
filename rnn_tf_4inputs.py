@@ -10,7 +10,7 @@ import glob
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
-N_INPUTS = 2
+N_INPUTS = 4
 N_TIME = 10
 THIN_PART = 1
 THIN_PART2 = 20
@@ -24,8 +24,8 @@ def create_dataset(N_TIME,N_INPUTS):
 
     for i in range(THIN_PART,30):
         for j in range(1,11):
-            path_ij = "output_data/each_object/output_test_{}_{}.csv".format(i,PATICULAR_ID)
-            path_ij_tag = "output_data/annotation/annotation_{}_{}.csv".format(i,PATICULAR_ID)
+            path_ij = "output_data/each_object/output_test_{}_{}.csv".format(i,j)
+            path_ij_tag = "output_data/annotation/annotation_{}_{}.csv".format(i,j)
             
             datalist = glob.glob(path_ij)
             if datalist == []:
@@ -41,7 +41,7 @@ def create_dataset(N_TIME,N_INPUTS):
             n_sample_ij = np_input.shape[0] - N_TIME + 1
             input_data_ij = np.zeros((n_sample_ij, N_TIME, N_INPUTS))
             for _ in range(n_sample_ij):
-                input_data_ij[_] = np_input[_:_+N_TIME, 2:2+N_INPUTS]
+                input_data_ij[_] = np_input[_:_+N_TIME, 0:0+N_INPUTS]
             input_data = np.concatenate([input_data, input_data_ij])
 
             #### correct data (m, 1)
@@ -60,6 +60,8 @@ def create_dataset(N_TIME,N_INPUTS):
 
     # print("train_data_num", train_data_num)
     input_data = input_data[1:]
+    input_data[:,:,0] = input_data[:,:,0]*0.01
+    input_data[:,:,1] = input_data[:,:,1]*0.01
     correct_data = correct_data[1:]
     return input_data, correct_data
 
@@ -103,8 +105,17 @@ def main():
     predicted[predicted>0.5] = 1
     predicted[predicted<=0.5] = 0
     cm = confusion_matrix(y_test, predicted)
+    accuracy = (cm[0,0]+cm[1,1])/(cm[0,0]+cm[0,1]+cm[1,0]+cm[1,1])
+    precision = (cm[1,1]/(cm[0,1] + cm[1,1]))
+    recall = (cm[1,1]/(cm[1,1] + cm[1,0]))
+    specificity = (cm[0,0]/(cm[0,0] + cm[0,1]))
+    F = (2*recall*precision/(recall+precision))
     print("cm", cm)
-    print("accuracy", (cm[0,0]+cm[1,1])/(cm[0,0]+cm[0,1]+cm[1,0]+cm[1,1]))
+    print("Accuracy", accuracy)
+    print("Precision", precision)
+    print("Recall", recall)
+    print("Specificity", specificity)
+    print("F-measure", F)
 
     #### make figure
     plt.figure()
@@ -115,6 +126,8 @@ def main():
     # compare prediction with correct (divide train and test data by sklearn)
     plt.plot(range(0, y_test.shape[0]), y_test, color="r", label="row_data")
     plt.plot(range(0, predicted.shape[0]), predicted, color="b", label="predict_data")
+    # plt.plot(range(0, 50), y_test[0:50], color="r", label="row_data")
+    # plt.plot(range(0, 50), predicted[0:50], color="b", label="predict_data")
     plt.legend()
 
     # see train data merely
@@ -127,7 +140,7 @@ def main():
     # plt.plot(history.history['val_accuracy'])
     # plt.legend(['accuracy','validation accuracy'])
     plt.show()
-
+    model.save('./save_model/my_model.h5')
 
 if __name__ == "__main__":
     main()
